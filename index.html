@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ドローン関連記事（最新順）</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', sans-serif;
+      background-color: #eef6fb;
+      color: #002b55;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background-color: #005bac;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    .article {
+      background-color: white;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 50, 0.05);
+    }
+
+    .article a {
+      font-size: 1.1rem;
+      color: #003366;
+      text-decoration: none;
+    }
+
+    .article a:hover {
+      text-decoration: underline;
+    }
+
+    .meta {
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: 0.3rem;
+    }
+
+    .company-list {
+      font-size: 0.85rem;
+      color: #003366;
+      margin-top: 5px;
+    }
+
+    #loading {
+      text-align: center;
+      font-size: 1.1rem;
+      margin-top: 2rem;
+      color: #003366;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 0.5rem;
+      }
+
+      .article {
+        padding: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ドローン関連記事（最新順）</h1>
+  </header>
+
+  <div class="container">
+    <div id="loading">記事を取得中です...</div>
+    <div id="articles"></div>
+  </div>
+
+  <script>
+    const apiKey = "AIzaSyCtwpJtGR2s-ETx4UNgMFzKkexPkeRYM2E";
+    const cx = "659113dbc2cb84e02";
+    const query = "ドローン";
+
+    function extractCompanies(snippet) {
+      const candidates = [];
+      const regexes = [
+        /[\\p{Script=Katakana}ー]{2,}(株式会社)?/gu,
+        /[\\p{Script=Han}ー]{2,}(株式会社)/gu,
+        /[\\p{Script=Han}ー]{2,}(企業|会社)/gu
+      ];
+      regexes.forEach(regex => {
+        let match;
+        while ((match = regex.exec(snippet)) !== null) {
+          candidates.push(match[0]);
+        }
+      });
+
+      return [...new Set(candidates)].slice(0, 5);
+    }
+
+    async function fetchArticles() {
+      let articles = [];
+      const seenTitles = new Set();
+
+      for (let start = 1; start <= 50; start += 10) {
+        const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&lr=lang_ja&num=10&start=${start}`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          const items = data.items || [];
+
+          for (const item of items) {
+            if (!item.title || seenTitles.has(item.title)) continue;
+            seenTitles.add(item.title);
+
+            const snippet = item.snippet || '';
+            const companyList = extractCompanies(snippet);
+            const pubDateMatch = snippet.match(/\\d{4}[年/-]\\d{1,2}[月/-]\\d{1,2}[日]?/);
+            const pubDate = pubDateMatch ? pubDateMatch[0].replace(/[年月]/g, '/').replace('日', '') : "日付不明";
+
+            articles.push({
+              title: item.title,
+              link: item.link,
+              source: item.displayLink || '不明',
+              date: pubDate,
+              companies: companyList
+            });
+
+            if (articles.length >= 50) break;
+          }
+
+          if (articles.length >= 50) break;
+        } catch (error) {
+          console.error("APIエラー:", error);
+          break;
+        }
+      }
+
+      displayArticles(articles);
+    }
+
+    function displayArticles(articles) {
+      const container = document.getElementById("articles");
+      const loading = document.getElementById("loading");
+      loading.style.display = "none";
+
+      if (articles.length === 0) {
+        container.innerHTML = "<p>記事が見つかりませんでした。</p>";
+        return;
+      }
+
+      articles.forEach(article => {
+        const div = document.createElement("div");
+        div.className = "article";
+
+        div.innerHTML = `
+          <a href="${article.link}" target="_blank" rel="noopener noreferrer">${article.title}</a>
+          <div class="meta">公開日: ${article.date}</div>
+          <div class="meta">公開元: ${article.source}</div>
+          <div class="company-list">取り上げ企業: ${article.companies.length > 0 ? article.companies.join('、') : '不明'}</div>
+        `;
+
+        container.appendChild(div);
+      });
+    }
+
+    fetchArticles();
+  </script>
+</body>
+</html>
